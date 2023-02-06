@@ -11,7 +11,8 @@
             "terminal.integrated.defaultProfile.linux": "/bin/bash",
             "extensions": [
 				"github.copilot",
-				"ms-python.python"
+				"ms-python.python",
+				"eamodio.gitlens"
 			],
             "devPort": 8888
         }
