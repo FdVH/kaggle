@@ -1,9 +1,11 @@
 {
     "name": "Kaggle Dev CPU",
     "image": "gcr.io/kaggle-images/python", // Remember to pull latest before rebuilding.
+    "workspaceMount": "source=${localWorkspaceFolder},target=/kaggle,type=bind",
+    "workspaceFolder": "/kaggle",
     "mounts": [
-        "type=bind,source=${localWorkspaceFolder}/data/input,target=/kaggle/input",
-        "type=bind,source=${localWorkspaceFolder}/data/results,target=/kaggle/results"
+        "source=${localWorkspaceFolder}\\data\\input,target=/kaggle/input,type=bind",
+        "source=${localWorkspaceFolder}\\data\\results,target=/kaggle/results,type=bind"
     ],
     "customizations": {
         "vscode": {
@@ -20,7 +22,7 @@
     "containerEnv": {
         "KAGGLE_MODE": "DEV"
     },
-    "postCreateCommand": ".devcontainer/setup.sh",
+    // "postCreateCommand": ".devcontainer/setup.sh",
     "postAttachCommand": ".devcontainer/setup-mounted.sh",
     "shutdownAction": "none"
 }
