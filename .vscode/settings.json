@@ -1,0 +1,17 @@
+{
+    "editor.renderWhitespace": "none",
+    "workbench.startupEditor": "newUntitledFile",
+    "workbench.colorTheme": "Monokai Pro (Filter Machine)",
+    "workbench.iconTheme": "material-icon-theme",
+    "git.ignoreLegacyWarning": true,
+    "editor.rulers": [
+        79
+    ],
+    "workbench.colorCustomizations": {
+        "editorRuler.foreground": "#56ff40"
+    },
+    "github.gitProtocol": "ssh",
+    "git.confirmSync": false,
+    "editor.inlineSuggest.enabled": true,
+    "notebook.output.textLineLimit": 50
+}
