@@ -1,0 +1,50 @@
+2023-03-28 17:19:39,833 - INFO - START PRE-PROCESSING
+2023-03-28 17:19:39,835 - INFO - Loading raw data.
+2023-03-28 17:20:00,488 - INFO - Making CV splits.
+2023-03-28 17:20:00,846 - INFO - Loading encodings.
+2023-03-28 17:20:01,427 - INFO - Successfully loaded and processed data.
+2023-03-28 17:20:01,430 - DEBUG - prepare_data took 21.595193 s to complete.
+2023-03-28 17:20:01,432 - INFO - END PRE-PROCESSING
+2023-03-28 17:20:01,491 - INFO - START TRAINING - 2023-03-28 17:20:01.491436
+2023-03-28 17:20:01,506 - INFO - Stage 1 (retriever) setup complete. Training size: 54820. Validation size: 6697. Batch size: 512.
+2023-03-28 17:20:33,190 - INFO - Begin training of 1033728 parameters.
+Fold: 0. Top-k: 50. Gradient checkpointing: True. Automatic mixed precision: True. GPU available: True.
+2023-03-28 17:28:10,027 - INFO - Epoch 1 train loss: 3.69004, val loss: 4.45429
+2023-03-28 17:28:18,299 - INFO - Checkpoint saved to: /kaggle/working/output/checkpoints/retriever_ckpt_20230328_172001_1.pt
+2023-03-28 17:35:45,580 - INFO - Epoch 2 train loss: 1.50508, val loss: 4.24192
+2023-03-28 17:35:53,810 - INFO - Checkpoint saved to: /kaggle/working/output/checkpoints/retriever_ckpt_20230328_172001_2.pt
+2023-03-28 17:43:21,282 - INFO - Epoch 3 train loss: 0.91861, val loss: 4.22691
+2023-03-28 17:43:30,446 - INFO - Checkpoint saved to: /kaggle/working/output/checkpoints/retriever_ckpt_20230328_172001_3.pt
+2023-03-28 17:50:56,862 - INFO - Epoch 4 train loss: 0.74694, val loss: 4.20951
+2023-03-28 17:51:04,697 - INFO - Checkpoint saved to: /kaggle/working/output/checkpoints/retriever_ckpt_20230328_172001_4.pt
+2023-03-28 17:58:31,651 - INFO - Epoch 5 train loss: 0.70235, val loss: 4.15806
+2023-03-28 17:58:41,255 - INFO - Checkpoint saved to: /kaggle/working/output/checkpoints/retriever_ckpt_20230328_172001_5.pt
+2023-03-28 18:06:08,268 - INFO - Epoch 6 train loss: 0.67077, val loss: 4.15909
+2023-03-28 18:13:35,758 - INFO - Epoch 7 train loss: 0.64738, val loss: 4.14765
+2023-03-28 18:13:43,901 - INFO - Checkpoint saved to: /kaggle/working/output/checkpoints/retriever_ckpt_20230328_172001_7.pt
+2023-03-28 18:21:10,800 - INFO - Epoch 8 train loss: 0.6324, val loss: 4.12162
+2023-03-28 18:21:19,326 - INFO - Checkpoint saved to: /kaggle/working/output/checkpoints/retriever_ckpt_20230328_172001_8.pt
+2023-03-28 18:28:45,823 - INFO - Epoch 9 train loss: 0.62161, val loss: 4.1362
+2023-03-28 18:36:13,486 - INFO - Epoch 10 train loss: 0.61538, val loss: 4.16116
+2023-03-28 18:43:40,531 - INFO - Epoch 11 train loss: 0.60168, val loss: 4.17042
+2023-03-28 18:51:07,470 - INFO - Epoch 12 train loss: 0.5974, val loss: 4.16349
+2023-03-28 18:58:35,041 - INFO - Epoch 13 train loss: 0.59541, val loss: 4.14142
+2023-03-28 19:06:01,284 - INFO - Epoch 14 train loss: 0.59048, val loss: 4.16112
+2023-03-28 19:13:27,701 - INFO - Epoch 15 train loss: 0.58552, val loss: 4.15196
+2023-03-28 19:20:54,689 - INFO - Epoch 16 train loss: 0.58558, val loss: 4.12652
+2023-03-28 19:28:21,393 - INFO - Epoch 17 train loss: 0.58611, val loss: 4.1447
+2023-03-28 19:35:48,626 - INFO - Epoch 18 train loss: 0.58228, val loss: 4.10418
+2023-03-28 19:35:57,386 - INFO - Checkpoint saved to: /kaggle/working/output/checkpoints/retriever_ckpt_20230328_172001_18.pt
+2023-03-28 19:43:24,305 - INFO - Epoch 19 train loss: 0.57885, val loss: 4.17456
+2023-03-28 19:50:51,815 - INFO - Epoch 20 train loss: 0.57879, val loss: 4.11023
+2023-03-28 19:50:51,889 - INFO - ################ Fold 0 best performance: ################
+    epochs: dict_values([20, 0])
+    retriever_val_loss: 4.10418
+    retriever_ckpt_path: /kaggle/working/output/checkpoints/retriever_ckpt_20230328_172001_18.pt
+    reranker_val_loss: inf
+    reranker_ckpt_path: inf
+2023-03-28 19:50:51,891 - INFO - Checkpoints stored:
+    retriever_ckpt_20230328_172001_18.pt
+2023-03-28 19:50:51,892 - INFO - END TRAINING  - 2023-03-28 19:50:51.892060 (+2:30:50.400624)
+2023-03-28 19:50:53,337 - INFO - Checkpoints stored:
+    retriever_ckpt_20230328_172001_18.pt
