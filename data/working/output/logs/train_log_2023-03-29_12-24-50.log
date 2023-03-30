@@ -1,0 +1,33 @@
+2023-03-29 12:24:50,096 - INFO - START TRAINING - 2023-03-29 12:24:50.094815
+2023-03-29 12:24:50,097 - INFO - Loading raw data.
+2023-03-29 12:25:10,183 - INFO - Making CV splits.
+2023-03-29 12:25:10,542 - INFO - Loading encodings.
+2023-03-29 12:25:11,091 - INFO - Successfully loaded and processed data.
+2023-03-29 12:25:11,093 - DEBUG - prepare_data took 20.996025 s to complete.
+2023-03-29 12:25:11,157 - INFO - Stage 2 (reranker) setup complete. Training size: 364028. Validation size: 55851. Batch size: 256.
+2023-03-29 12:25:23,426 - INFO - Begin training of 117640705 parameters.
+Fold: 0. Top-k: 50. Gradient checkpointing: True. Automatic mixed precision: True. GPU available: True.
+2023-03-29 13:15:47,655 - INFO - Epoch 1 train loss: 0.65848, val loss: 1.118
+2023-03-29 13:15:50,704 - INFO - Checkpoint saved to: /kaggle/working/output/checkpoints/reranker_ckpt_20230329_122511_1.pt
+2023-03-29 14:06:09,884 - INFO - Epoch 2 train loss: 0.23695, val loss: 0.90016
+2023-03-29 14:06:12,960 - INFO - Checkpoint saved to: /kaggle/working/output/checkpoints/reranker_ckpt_20230329_122511_2.pt
+2023-03-29 14:56:32,846 - INFO - Epoch 3 train loss: 0.13602, val loss: 0.81222
+2023-03-29 14:56:36,036 - INFO - Checkpoint saved to: /kaggle/working/output/checkpoints/reranker_ckpt_20230329_122511_3.pt
+2023-03-29 15:46:56,018 - INFO - Epoch 4 train loss: 0.09492, val loss: 0.88583
+2023-03-29 16:37:15,191 - INFO - Epoch 5 train loss: 0.06433, val loss: 0.96158
+2023-03-29 17:27:34,466 - INFO - Epoch 6 train loss: 0.04454, val loss: 1.05275
+2023-03-29 18:17:54,027 - INFO - Epoch 7 train loss: 0.02844, val loss: 1.12648
+2023-03-29 19:08:13,411 - INFO - Epoch 8 train loss: 0.01808, val loss: 1.06608
+2023-03-29 19:58:32,841 - INFO - Epoch 9 train loss: 0.01063, val loss: 1.29519
+2023-03-29 20:48:52,721 - INFO - Epoch 10 train loss: 0.00742, val loss: 1.48136
+2023-03-29 20:48:52,724 - INFO - ################ Fold 0 best performance: ################
+    epochs: dict_values([0, 10])
+    retriever_val_loss: inf
+    retriever_ckpt_path: inf
+    reranker_val_loss: 0.81222
+    reranker_ckpt_path: /kaggle/working/output/checkpoints/reranker_ckpt_20230329_122511_3.pt
+2023-03-29 20:48:52,726 - INFO - Checkpoints stored:
+    reranker_ckpt_20230329_122511_3.pt
+2023-03-29 20:48:52,727 - INFO - END TRAINING   - 2023-03-29 20:48:52.727245 (+8:24:02.632430)
+2023-03-29 20:49:02,009 - INFO - Checkpoints stored:
+    reranker_ckpt_20230329_122511_3.pt
