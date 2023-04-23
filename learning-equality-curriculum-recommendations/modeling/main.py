@@ -916,17 +916,11 @@ class Retriever(BiEncoder):
         content_emb = infer_pred(content_loader,
                                  self.content_encoder)['content_emb']
         
-        # Find top-k similar contents for each topic
-        top_k_sim_val, top_k_sim_idx = retrieve_top_k_contents(topic_emb,
-                                                               content_emb)
+        # Retrieve top content matches for each topic
+        pairs = retrieve_top_contents(topic_emb, content_emb,
+                                      topic_loader.dataset.items)
         
-        # Filter out pairs with similarity below a dynamic threshold
-        dynamic_thresh = (1 - cfg.sim_margin) * top_k_sim_val[:, 0][:, None]
-        mask = (top_k_sim_val >= dynamic_thresh).flatten()
-        stage_1_pairs = get_pairs(top_k_sim_idx,
-                                  topic_loader.dataset.item_index)[mask]
-        
-        return stage_1_pairs
+        return pairs
 
 class Reranker(CrossEncoderClassifier):
     def __init__(self):
@@ -969,9 +963,9 @@ def index_corpus(corpus_vectors: np.ndarray) -> faiss.IndexIVF:
     index.nprobe = cfg.index_nprobe
     return index
 
-def top_k_cos_sim_in_chunks(query_vectors: Tensor, corpus_vectors: Tensor,
-                            k: int = 100, chunk_size: int = 512) \
-                            -> Tuple[np.ndarray, np.ndarray]:
+def top_k_cossim_in_chunks(query_vectors: Tensor, corpus_vectors: Tensor,
+                           k: int = 100, chunk_size: int = 512) \
+                           -> Tuple[np.ndarray, np.ndarray]:
     """Return the top k cosine similarities and indices between query and
     corpus vectors (evaluated in chunks to avoid OOM errors)."""
     a, b, s = query_vectors, corpus_vectors, chunk_size
@@ -995,10 +989,10 @@ def top_k_cos_sim_in_chunks(query_vectors: Tensor, corpus_vectors: Tensor,
         
     return top_k_out_val.cpu().numpy(), top_k_out_idx.cpu().numpy()
 
-def retrieve_top_k_contents(topic_emb: Union[Tensor, np.ndarray],
-                            content_emb: Union[Tensor, np.ndarray]) \
-                            -> Tuple[np.ndarray, np.ndarray]:
-    """Retrieve the top-k content indices (and similarity values) for each
+def top_k_cossim_contents(topic_emb: Union[Tensor, np.ndarray],
+                          content_emb: Union[Tensor, np.ndarray]) \
+                          -> Tuple[np.ndarray, np.ndarray]:
+    """Return the top-k content indices and similarity values for each
     topic given topic and content embeddings."""    
     top_k_sim_val = np.zeros((len(topic_emb), cfg.top_k), dtype=float)
     top_k_sim_idx = np.zeros((len(topic_emb), cfg.top_k), dtype=np.int32)
@@ -1020,19 +1014,45 @@ def retrieve_top_k_contents(topic_emb: Union[Tensor, np.ndarray],
             index = index_corpus(c_emb_sub)
             top_k_val, top_k_idx = index.search(t_emb_sub, cfg.top_k)
         else:
-            top_k_val, top_k_idx = top_k_cos_sim_in_chunks(t_emb_sub, c_emb_sub,
-                                                           cfg.top_k)
+            top_k_val, top_k_idx = top_k_cossim_in_chunks(t_emb_sub, c_emb_sub,
+                                                          cfg.top_k)
         top_k_sim_val[topic_nums] = top_k_val
         top_k_sim_idx[topic_nums] = content_nums[top_k_idx]
 
     return top_k_sim_val, top_k_sim_idx
+
+def dynamic_threshold(x: np.ndarray[float]) -> np.ndarray[bool]:
+    maxima = np.max(x, axis=1)[:, None]
+    thresholds = (1 - cfg.threshold_margin) * maxima
+    mask = (x >= thresholds).flatten()
+    logger.debug(f'Fraction of pairs above dynamic similarity \
+                   threshold: {mask.sum()/len(mask)*100:.2f}%')
+    return mask
+
+def retrieve_top_contents(topic_emb: Union[Tensor, np.ndarray],
+                          content_emb: Union[Tensor, np.ndarray],
+                          topic_nums: np.ndarray) -> np.ndarray:
+    """Retrieve the top matching contents for each topic given topic and
+    content embeddings."""
+    # Find top-k content indices and similarity values for each topic
+    top_k_sim_val, top_k_sim_idx = top_k_cossim_contents(topic_emb,
+                                                         content_emb)
+    
+    # Mask out matches with similarity below a dynamic threshold
+    mask = dynamic_threshold(top_k_sim_val)
+    
+    # Convert to topic-content pairs and apply filter
+    pairs = get_pairs(top_k_sim_idx, topic_nums)[mask]
+    
+    return pairs
+    
 
 def rerank_top_k_contents(logits: Union[Tensor, np.ndarray]) \
                           -> np.ndarray[bool]:
     """Return a mask retaining indices where logits are above a threshold."""
     if not isinstance(logits, Tensor):
         logits = tensor(logits, dtype=torch.float)
-    reco_mask = (nn.Sigmoid()(logits) > cfg.rerank_threshold).cpu().numpy() #TODO: make dynamic thresh
+    reco_mask = (nn.Sigmoid()(logits) > cfg.rerank_threshold).cpu().numpy() #TODO: input topic index and make thresh dynamic
     return reco_mask
 
 def reco_pairs_to_series(pairs: Union[Tensor, np.ndarray],
@@ -1083,6 +1103,15 @@ def evaluate_recommendations(recommendations: pd.Series) -> Dict[float]:
     return dict(recall=round(recall.mean(), cfg.precision),
                 precision=round(precision.mean(), cfg.precision),
                 f2score=round(f2score.mean(), cfg.precision))
+    
+def evaluate_pairs(pairs: Tensor) -> dict:
+    """Evaluation wrapper with logging for topic-content pairs."""
+    logger.info(f'Evaluating recommendations')
+    recos = reco_pairs_to_series(pairs)
+    eval_metrics = evaluate_recommendations(recos)
+    logger.info(f'Achieved ' + ', '.join([f'{k}: {v:.5f}'
+                for k, v in eval_metrics.items()]))
+    return eval_metrics
     
 # --------------------------------------------------------------------------- #
 #                                 Trainer                                     #
@@ -1316,7 +1345,8 @@ class StagedTrainer:
             self.tb_writer.add_scalars(*named_dict, self.epoch)
         self.tb_writer.flush()
     
-    def make_recos(self, model): #TODO: move to Retriver/Reranker classes and return pairs
+    def make_recos(self, model: BaseModule) -> None: #TODO: move to Retriver/Reranker classes and return pairs
+        """Forward pass model on all available data and store the results."""
         if self.stage_name == 'retriever':
             pairs = None
             topic_set = RetrieverTestSet(topics_df.num.values)
@@ -1342,14 +1372,14 @@ class StagedTrainer:
         reco_pairs = model.make_recos(loaders)
         self.recos[f'stage_{self.stage_num}_pairs'] = reco_pairs
         
-    def eval_recos(self): #TODO: Input pairs with option for OOF or full test
+    def eval_recos(self) -> None: #TODO: Input pairs with option for OOF or full test
         # Evaluate recos
         reco_pairs = self.recos[f'stage_{self.stage_num}_pairs']
         recos = reco_pairs_to_series(reco_pairs)
         logger.info(f'Evaluating predictions.')
         eval_metrics = evaluate_recommendations(recos) 
         
-        # Log
+        # Log metrics
         to_logger = []
         for m, v in eval_metrics.items():
             self.best_model[f'{self.stage_name}_{m}'] = v
@@ -1358,19 +1388,18 @@ class StagedTrainer:
     
     def train(self, model: BaseModule) -> None:
         assert self.stage_num in self.stage_epochs, 'Check stage setup.'
-        self.optimizer = torch.optim.Adam(model.parameters(),
-                                          cfg.learning_rate)
+        self.optimizer = torch.optim.Adam(model.parameters(), cfg.max_lr)
         self.scaler = torch.cuda.amp.GradScaler(enabled=(cfg.use_amp
                                                         & (cfg.device=="cuda")))
         steps_per_epoch = int(np.ceil(len(self.train_loader)
                                       * 1./cfg.grad_accumulation_steps))
         self.scheduler = torch.optim.lr_scheduler.OneCycleLR(self.optimizer, 
-            max_lr = cfg.learning_rate,
+            max_lr = cfg.max_lr,
             steps_per_epoch = steps_per_epoch,
             epochs = self.stage_epochs[self.stage_num],
-            div_factor = 25, #TODO: make cfg parameters
-            pct_start = 0.3,
-            final_div_factor = 100,
+            div_factor = cfg.div_factor,
+            pct_start = cfg.pct_start,
+            final_div_factor = cfg.final_div_factor
         )
         
         logger.info(f'Begin training of {model.count_params()} parameters.\n\
@@ -1397,3 +1426,58 @@ class StagedTrainer:
             # Save checkpoint
             self.save_checkpoint(model)
         self.epoch = 0
+
+# --------------------------------------------------------------------------- #
+#                                 Inference                                   #
+# --------------------------------------------------------------------------- #
+
+def infer_stage_1(model_ckpt: dict) -> Tensor:
+    retriever_model = BiEncoder()
+    retriever_model.load_state_dict(model_ckpt['model'])
+    retriever_model.to(cfg.device)
+
+    topic_nums = topics_df.num.values
+    content_nums = content_df.num.values
+    topic_set = RetrieverTestSet(topic_nums)
+    content_set = RetrieverTestSet(content_nums)
+    topic_loader = DataLoader(topic_set,
+                              shuffle=False,
+                              batch_size=2*cfg.retriever_batch_size,
+                              collate_fn=prepare_retriever_test_topic_batch)
+    content_loader = DataLoader(content_set,
+                                shuffle=False,
+                                batch_size=2*cfg.retriever_batch_size,
+                                collate_fn=prepare_retriever_test_content_batch)
+
+    topic_emb = infer_pred(topic_loader,
+                           retriever_model.topic_encoder)['topic_emb']
+    content_emb = infer_pred(content_loader,
+                             retriever_model.content_encoder)['content_emb']
+    stage_1_pairs = retrieve_top_contents(topic_emb, content_emb, topic_nums)    
+    
+    return stage_1_pairs
+
+def infer_stage_2(model_ckpt: dict, stage_1_pairs: Tensor) -> Tensor:        
+    reranker_model = CrossEncoderClassifier()
+    reranker_model.load_state_dict(model_ckpt['model'])
+    reranker_model.to(cfg.device)
+
+    pair_set = RerankerTestSet(stage_1_pairs)
+    pair_loader = DataLoader(pair_set,
+                             shuffle=False, 
+                             batch_size=2*cfg.reranker_batch_size, 
+                             collate_fn=prepare_reranker_test_batch)
+
+    logits = infer_pred(pair_loader, reranker_model)['logits']
+    mask = rerank_top_k_contents(logits)
+    stage_2_pairs = stage_1_pairs[mask]
+
+    return stage_2_pairs
+
+def make_submission(pairs: Tensor) -> None:
+    recos = reco_pairs_to_series(pairs).apply(lambda x: ' '.join(x))
+    recos = pd.DataFrame({'topic_id': recos.index,
+                          'content_ids': recos.values})
+    recos = recos.loc[recos.topic_id.isin(sample_submission_df.topic_id)] \
+                 .reset_index(drop=True)
+    recos.to_csv('submission.csv', index=False)
