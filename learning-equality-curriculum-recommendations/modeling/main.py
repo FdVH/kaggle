@@ -9,7 +9,7 @@ import logging
 import psutil
 import numpy as np
 import pandas as pd
-import faiss
+# import faiss
 import torch
 import torch.nn.functional as F
 from torch import nn, Tensor, tensor
@@ -31,6 +31,7 @@ from datetime import datetime
 from collections import defaultdict
 from inspect import getframeinfo, stack
 from tqdm import tqdm
+from numpy.typing import NDArray
 
 # --------------------------------------------------------------------------- #
 #                                 Utilities                                   #
@@ -257,9 +258,9 @@ def DEBUG_RAM() -> None:
                  psutil.virtual_memory().total, 1)
     logger.debug(f'{caller.filename}:{caller.lineno} - ' \
                  f'RAM {ram}% : VRAM {vram}% : GPU_RAM {gpu_ram}%')
-        
-def id_to_int(item_ids: Union[np.ndarray[str], pd.Index[str]], 
-              item_type: str = 'topic') -> np.ndarray:
+
+def id_to_int(item_ids: Union[NDArray[np.str_], pd.Index],
+              item_type: str = 'topic') -> NDArray:
     """Get the integer representation of topic or content id(s)."""
     global topics_df, content_df
     if type(item_ids) == str:
@@ -271,7 +272,7 @@ def id_to_int(item_ids: Union[np.ndarray[str], pd.Index[str]],
     else:
         raise Exception(f'item_type: {item_type} not implemented')
         
-def int_to_id(item_nums: Union[List[int], np.ndarray[int]],
+def int_to_id(item_nums: Union[List[int], NDArray[np.int_]],
               item_type: str = 'topic') -> pd.Index:
     """Get the string id representation of topic or content number(s)."""
     if type(item_nums) == int:
@@ -283,8 +284,9 @@ def int_to_id(item_nums: Union[List[int], np.ndarray[int]],
     else:
         raise Exception(f'item_type: {item_type} not implemented')
 
-def tensor_dict_to(tensor_dict: Dict[Tensor], pin_memory: bool = False, 
-                   device: Union[str, torch.device] = None) -> Dict[Tensor]:
+def tensor_dict_to(tensor_dict: Dict[str, Tensor], pin_memory: bool = False, 
+                   device: Union[str, torch.device] = None) \
+                   -> Dict[str, Tensor]:
     """Return a dictionary of tensors on the specified device, with option
     to stage in pinned memory."""
     out = {}
@@ -308,7 +310,8 @@ def get_ids(item_list: List[Union[Topic, ContentItem]]) -> List[str]:
 #                               Pre-processing                                #
 # --------------------------------------------------------------------------- #
 def make_repr(df: pd.DataFrame, use_title: bool = True, use_descr: bool = False,
-              use_text: bool = False, use_level: bool = False) -> List[str]:
+              use_text: bool = False, use_level: bool = False,
+              ) -> List[str]:
     """Return a list of concatenated text representations for all topic or
     content items with text features in a DataFrame."""
     fields = []
@@ -323,8 +326,8 @@ def make_repr(df: pd.DataFrame, use_title: bool = True, use_descr: bool = False,
     return text
 
 def encode_in_chunks(text: List[str], tokenizer: PreTrainedTokenizerFast,
-                     max_seq_length: int = 512, chunk_size: int = 16384
-                     ) -> BatchEncoding[np.ndarray]:
+                     max_seq_length: int = 512, chunk_size: int = 16384,
+                     ) -> BatchEncoding:
     """Encode text in chunks to avoid OOM errors."""
     encodings = BatchEncoding()
     for offset in range(0, len(text), chunk_size):
@@ -338,8 +341,8 @@ def encode_in_chunks(text: List[str], tokenizer: PreTrainedTokenizerFast,
                 encodings[k] = np.concatenate((encodings[k], v), axis=0)
     return encodings
 
-def memmap_encodings(encodings: BatchEncoding[np.ndarray],
-                     path: Union[str, Path]) -> np.memmap:
+def memmap_encodings(encodings: BatchEncoding, path: Union[str, Path],
+                     ) -> np.memmap:
     """Save encodings to a memmap file."""
     values = np.array(list(encodings.values()))
     encodings = np.memmap(path, mode='w+', shape=values.shape, dtype=np.int16)
@@ -351,8 +354,8 @@ def memmap_encodings(encodings: BatchEncoding[np.ndarray],
 @timeit
 def prepare_data(train: bool = True, load_enc: bool = False) -> None:
     """Prepare data for training or inference."""
-    global cfg, logger, topics_df, topic_encodings, content_df,\
-        content_encodings, correlations_df, sample_submission_df,\
+    global cfg, logger, topics_df, topic_encodings, content_df, \
+        content_encodings, correlations_df, sample_submission_df, \
         tc_edge_index, tt_edge_index, neighbor_sampler, tc_graph
     
     # Load raw data
@@ -505,6 +508,7 @@ class BaseModule(nn.Module):
 class MeanPooling(BaseModule):
     def __init__(self):
         super().__init__()
+        
     def forward(self, token_embeddings: Tensor, attention_mask: Tensor) \
         -> Tensor:
         input_mask_expanded = attention_mask.unsqueeze(-1) \
@@ -525,7 +529,8 @@ class SentenceEncoder(BaseModule):
         self.config = config
         self.backbone = backbone
         self.pool = MeanPooling()
-    def forward(self, encodings: BatchEncoding[Tensor]) -> Tensor:
+        
+    def forward(self, encodings: BatchEncoding) -> Tensor:
         embeddings = self.backbone(**encodings)
         embeddings = self.pool(embeddings.last_hidden_state,
                                encodings.attention_mask)
@@ -541,9 +546,11 @@ class SAGE(BaseModule):
         for _ in range(num_layers - 2):
             self.convs.append(SAGEConv(hidden_channels, hidden_channels, aggr))
         self.convs.append(SAGEConv(hidden_channels, in_out_channels, aggr))
+        
     def reset_parameters(self):
         for conv in self.convs:
             conv.reset_parameters()
+            
     def forward(self, x: Tensor, adjs: List[Tuple]) -> Tensor:
         for i, (edge_index, _, size) in enumerate(adjs):
             x_target = x[:size[1]]  # Target nodes are always placed first.
@@ -562,8 +569,9 @@ class TopicEncoder(BaseModule):
                               hidden_channels=D,
                               num_layers=len(cfg.neighborhood_sizes),
                               aggr='mean')
-    def forward(self, encodings: BatchEncoding[Tensor], adjs: List[Tuple]) \
-        -> Dict[Tensor]:
+        
+    def forward(self, encodings: BatchEncoding, adjs: List[Tuple],
+                ) -> Dict[str, Tensor]:
         embeddings = self.sentence_encoder(encodings)
         if not cfg.bypass_post:
             embeddings = self.sage_conv(embeddings, adjs)
@@ -579,7 +587,8 @@ class ContentEncoder(BaseModule):
         nn.init.eye_(dense.weight)
         nn.init.zeros_(dense.bias)
         self.dense = dense
-    def forward(self, encodings: BatchEncoding[Tensor]) -> Dict[Tensor]:
+        
+    def forward(self, encodings: BatchEncoding) -> Dict[str, Tensor]:
         embeddings = self.sentence_encoder(encodings)
         if not cfg.bypass_post:
             embeddings = self.dense(embeddings)
@@ -591,11 +600,13 @@ class BiEncoder(BaseModule):
         super().__init__()
         self.topic_encoder = TopicEncoder()
         self.content_encoder = ContentEncoder()
-    def forward(self, topic_enc: BatchEncoding[Tensor], adjs: List[Tuple],
-                content_enc: BatchEncoding[Tensor]) -> Dict[Tensor]:
+        
+    def forward(self, topic_enc: BatchEncoding, adjs: List[Tuple],
+                content_enc: BatchEncoding) -> Dict[str, Tensor]:
         topic_emb = self.topic_encoder(topic_enc, adjs)['topic_emb']
         content_emb = self.content_encoder(content_enc)['content_emb']
         return dict(topic_emb=topic_emb, content_emb=content_emb)
+    
     def freeze_backbone(self):
         for param in self.topic_encoder.sentence_encoder.parameters():
             param.requires_grad = False
@@ -613,12 +624,13 @@ class CrossEncoderClassifier(BaseModule):
         backbone.resize_token_embeddings(len(cfg.tokenizer))
         self.config = config
         self.backbone = backbone
-    def forward(self, cross_enc: BatchEncoding[Tensor]) -> Dict[Tensor]:
+        
+    def forward(self, cross_enc: BatchEncoding) -> Dict[str, Tensor]:
         logits = self.backbone(**cross_enc).logits
         return dict(logits=logits.view(-1))
     
 @torch.no_grad()
-def infer_pred(loader: DataLoader, model: nn.Module) -> Dict[str, np.ndarray]:
+def infer_pred(loader: DataLoader, model: nn.Module) -> Dict[str, NDArray]:
     """Forward pass a model on a given loader and return predictions."""
     N = len(loader.dataset)
     n_batches, loader = len(loader), iter(loader)
@@ -677,8 +689,8 @@ class RerankerTestSet(Dataset):
     def __getitem__(self, item_num):
         return self.pairs[item_num]
 
-def get_pairs(content_matrix: Union[Tensor, np.ndarray],
-              topic_index: Union[Tensor, np.ndarray, None] = None) -> Tensor:
+def get_pairs(content_matrix: Union[Tensor, NDArray],
+              topic_index: Union[Tensor, NDArray, None] = None) -> Tensor:
     """Returns a tensor of pairs of topic and content numbers, where each
     element of 'topic_index' is paired to all elements of the corresponding row
     in 'content_matrix'."""
@@ -718,7 +730,7 @@ def label_pairs(pairs: Tensor) -> Tensor:
     return unsort_labels
     
 def get_enc(item_nums: Sequence[int], item_type: str = 'topic',
-            out_type: str = 'tensor') -> BatchEncoding[Tensor] | Tensor:
+            out_type: str = 'tensor') -> Union[BatchEncoding, Tensor]:
     """Get encodings for the slice of 'item_nums' of type 'item_type'."""
     if item_type == 'topic':
         enc_vals = tensor(topic_encodings[:, item_nums, :], dtype=torch.int)
@@ -732,7 +744,7 @@ def get_enc(item_nums: Sequence[int], item_type: str = 'topic',
     return enc_vals
 
 def get_cross_enc(topic_nums: Sequence[int], content_nums: Sequence[int],
-                  out_type: str = 'tensor') -> BatchEncoding[Tensor] | Tensor:
+                  out_type: str = 'tensor') -> Union[BatchEncoding, Tensor]:
     """Get encodings for the crossed slices of 'topic_nums' and 'content_nums',
     paired by input order."""
     assert len(content_nums) == len(topic_nums), 'No. topics and no. contents \
@@ -778,7 +790,7 @@ def sample_edges(edge_index: Tensor) -> Tensor:
     cum_sum = torch.cat((tensor([0]), cum_sum[:-1]))
     return edge_perm[:, ind_sorted[cum_sum]]
 
-def prepare_retriever_batch(topic_nums: Sequence[int]) -> Dict:
+def prepare_retriever_batch(topic_nums: Sequence[int]) -> dict:
     """Return a training input for the retriever given a batch of topic
     numbers."""
     if not isinstance(topic_nums, Tensor):
@@ -838,7 +850,7 @@ def prepare_retriever_batch(topic_nums: Sequence[int]) -> Dict:
     return dict(inputs=(topic_enc, adjs, content_enc), labels=labels)
 
 def prepare_reranker_batch(tuples: Sequence[Tuple[Tuple[int, int], int]]) \
-                           -> Dict:
+                           -> dict:
     """Return a training input for the reranker given a batch of tuples of the
     form ([t_num, c_num], label)."""
     pairs, labels = zip(*tuples)
@@ -854,7 +866,7 @@ def prepare_reranker_batch(tuples: Sequence[Tuple[Tuple[int, int], int]]) \
         labels = labels.to(cfg.device)
     return dict(inputs=(cross_enc,), labels=labels)
 
-def prepare_retriever_test_topic_batch(topic_nums: Sequence[int]) -> Dict:
+def prepare_retriever_test_topic_batch(topic_nums: Sequence[int]) -> dict:
     """Return a test input topic batch for the retriever."""
     if not isinstance(topic_nums, Tensor):
         topic_nums = tensor(topic_nums, dtype=torch.int32)
@@ -872,7 +884,7 @@ def prepare_retriever_test_topic_batch(topic_nums: Sequence[int]) -> Dict:
                                     device=cfg.device)
     return dict(inputs=(topic_enc, adjs))
 
-def prepare_retriever_test_content_batch(content_nums: Sequence[int]) -> Dict:
+def prepare_retriever_test_content_batch(content_nums: Sequence[int]) -> dict:
     """Return a test input content batch for the retriever."""
     if not isinstance(content_nums, Tensor):
         content_nums = tensor(content_nums, dtype=torch.int32)
@@ -882,7 +894,7 @@ def prepare_retriever_test_content_batch(content_nums: Sequence[int]) -> Dict:
                                       device=cfg.device)
     return dict(inputs=(content_enc,))
 
-def prepare_reranker_test_batch(pairs: Sequence[Sequence[int, int]]) -> Dict:
+def prepare_reranker_test_batch(pairs: Sequence[Sequence[int]]) -> dict:
     """Return a test input batch for the reranker."""
     pairs = torch.stack(pairs)
     cross_enc = get_cross_enc(*pairs.T, out_type='dict')
@@ -948,24 +960,24 @@ def get_model(stage):
     else:
         raise Exception(f'Stage {stage} not implemented.')
     
-def index_corpus(corpus_vectors: np.ndarray) -> faiss.IndexIVF:
-    """Return a searchable IVF Faiss index that is quantized using HNSW and
-    trained on the given corpus vectors."""
-    d = corpus_vectors.shape[-1]
-    quantizer = faiss.IndexHNSWFlat(d, cfg.index_nlinks,
-                                    faiss.METRIC_INNER_PRODUCT)
-    quantizer.hnsw.efConstruction = cfg.index_efConstruction
-    quantizer.hnsw.efSearch = cfg.index_efSearch
-    index = faiss.IndexIVFFlat(quantizer, d, cfg.index_nclusters,
-                                faiss.METRIC_INNER_PRODUCT)
-    index.train(corpus_vectors)
-    index.add(corpus_vectors)
-    index.nprobe = cfg.index_nprobe
-    return index
+# def index_corpus(corpus_vectors: NDArray) -> faiss.IndexIVF:
+#     """Return a searchable IVF Faiss index that is quantized using HNSW and
+#     trained on the given corpus vectors."""
+#     d = corpus_vectors.shape[-1]
+#     quantizer = faiss.IndexHNSWFlat(d, cfg.index_nlinks,
+#                                     faiss.METRIC_INNER_PRODUCT)
+#     quantizer.hnsw.efConstruction = cfg.index_efConstruction
+#     quantizer.hnsw.efSearch = cfg.index_efSearch
+#     index = faiss.IndexIVFFlat(quantizer, d, cfg.index_nclusters,
+#                                faiss.METRIC_INNER_PRODUCT)
+#     index.train(corpus_vectors)
+#     index.add(corpus_vectors)
+#     index.nprobe = cfg.index_nprobe
+#     return index
 
 def top_k_cossim_in_chunks(query_vectors: Tensor, corpus_vectors: Tensor,
-                           k: int = 100, chunk_size: int = 512) \
-                           -> Tuple[np.ndarray, np.ndarray]:
+                           k: int = 100, chunk_size: int = 512,
+                          ) -> Tuple[NDArray, NDArray]:
     """Return the top k cosine similarities and indices between query and
     corpus vectors (evaluated in chunks to avoid OOM errors)."""
     a, b, s = query_vectors, corpus_vectors, chunk_size
@@ -989,9 +1001,9 @@ def top_k_cossim_in_chunks(query_vectors: Tensor, corpus_vectors: Tensor,
         
     return top_k_out_val.cpu().numpy(), top_k_out_idx.cpu().numpy()
 
-def top_k_cossim_contents(topic_emb: Union[Tensor, np.ndarray],
-                          content_emb: Union[Tensor, np.ndarray]) \
-                          -> Tuple[np.ndarray, np.ndarray]:
+def top_k_cossim_contents(topic_emb: Union[Tensor, NDArray],
+                          content_emb: Union[Tensor, NDArray],
+                         ) -> Tuple[NDArray, NDArray]:
     """Return the top-k content indices and similarity values for each
     topic given topic and content embeddings."""    
     top_k_sim_val = np.zeros((len(topic_emb), cfg.top_k), dtype=float)
@@ -1010,7 +1022,7 @@ def top_k_cossim_contents(topic_emb: Union[Tensor, np.ndarray],
         t_emb_sub = topic_emb[topic_nums]
         c_emb_sub = content_emb[content_nums]
         # Use approximate index if corpus is too large for exact search
-        if len(content_nums) > cfg.use_index_above:          
+        if len(content_nums) > cfg.use_index_above:
             index = index_corpus(c_emb_sub)
             top_k_val, top_k_idx = index.search(t_emb_sub, cfg.top_k)
         else:
@@ -1021,7 +1033,7 @@ def top_k_cossim_contents(topic_emb: Union[Tensor, np.ndarray],
 
     return top_k_sim_val, top_k_sim_idx
 
-def dynamic_threshold(x: np.ndarray[float]) -> np.ndarray[bool]:
+def dynamic_threshold(x: NDArray[np.float_]) -> NDArray[np.bool_]:
     maxima = np.max(x, axis=1)[:, None]
     thresholds = (1 - cfg.threshold_margin) * maxima
     mask = (x >= thresholds).flatten()
@@ -1029,9 +1041,9 @@ def dynamic_threshold(x: np.ndarray[float]) -> np.ndarray[bool]:
                    threshold: {mask.sum()/len(mask)*100:.2f}%')
     return mask
 
-def retrieve_top_contents(topic_emb: Union[Tensor, np.ndarray],
-                          content_emb: Union[Tensor, np.ndarray],
-                          topic_nums: np.ndarray) -> np.ndarray:
+def retrieve_top_contents(topic_emb: Union[Tensor, NDArray],
+                          content_emb: Union[Tensor, NDArray],
+                          topic_nums: NDArray) -> NDArray:
     """Retrieve the top matching contents for each topic given topic and
     content embeddings."""
     # Find top-k content indices and similarity values for each topic
@@ -1047,15 +1059,15 @@ def retrieve_top_contents(topic_emb: Union[Tensor, np.ndarray],
     return pairs
     
 
-def rerank_top_k_contents(logits: Union[Tensor, np.ndarray]) \
-                          -> np.ndarray[bool]:
+def rerank_top_k_contents(logits: Union[Tensor, NDArray],
+                         ) -> NDArray[np.bool_]:
     """Return a mask retaining indices where logits are above a threshold."""
     if not isinstance(logits, Tensor):
         logits = tensor(logits, dtype=torch.float)
     reco_mask = (nn.Sigmoid()(logits) > cfg.rerank_threshold).cpu().numpy() #TODO: input topic index and make thresh dynamic
     return reco_mask
 
-def reco_pairs_to_series(pairs: Union[Tensor, np.ndarray],
+def reco_pairs_to_series(pairs: Union[Tensor, NDArray],
                          all_topics: bool = False) -> pd.Series:
     """Convert a tensor of topic-content pairs to a series of content id lists
     indexed by topic id."""
@@ -1070,7 +1082,7 @@ def reco_pairs_to_series(pairs: Union[Tensor, np.ndarray],
         reco_series = pd.concat([reco_series, wo_recos], axis=0)
     return reco_series
 
-def evaluate_recommendations(recommendations: pd.Series) -> Dict[float]:
+def evaluate_recommendations(recommendations: pd.Series) -> Dict[str, float]:
     """Evaluate content recommendations by computing recall, precision and
     F2-score for each topic and averaging by topic."""
     topic_ids = recommendations.index
@@ -1116,8 +1128,8 @@ def evaluate_pairs(pairs: Tensor) -> dict:
 # --------------------------------------------------------------------------- #
 #                                 Trainer                                     #
 # --------------------------------------------------------------------------- #
-def similarity_nll(topic_emb: Tensor, content_emb: Tensor,
-                   labels: Tensor[int]) -> Tensor:
+def similarity_nll(topic_emb: Tensor, content_emb: Tensor, labels: Tensor,
+                  ) -> Tensor:
     """Compute the negative log-likelihood of the dot-product similarity
     between topic and content embeddings."""
     assert topic_emb.size()[1] == content_emb.size()[1], "Topic and content \
