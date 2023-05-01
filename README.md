@@ -6,7 +6,7 @@ This repository contains personal projects associated with Kaggle competitions a
 
 The goal of this competition was to streamline the process of matching educational content (documents, videos, webpages, etc.) to specific topics in a curriculum (a collection of hierarchical subject taxonomies in various languages). The competition was hosted by the non-profit organization Learning Equality, together with The Learning Agency Lab and UNHCR. Efficient and scalable solutions would support efforts to help people across the world access quality education, providing curricular experts with tailored recommendations for open educational resources relevant to local school programs, therefore reducing their time spent curating content.
 
-See my public submission [here](https://www.kaggle.com/federicodevitohalevy/lecr-modeling).
+See my public submission [here](https://www.kaggle.com/federicodevitohalevy/lecr-modeling). (Note that hyperparameters may not match those described below.)
 
 ### Introduction
 
