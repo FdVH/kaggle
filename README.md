@@ -2,11 +2,11 @@
 
 This repository contains personal projects associated with Kaggle competitions and datasets.
 
-## [Learning Equality - Curriculum Recommendations](https://www.kaggle.com/competitions/learning-equality-curriculum-recommendations) (Dec 2022 - Mar 2023)
+## [Learning Equality - Curriculum Recommendations](https://www.kaggle.com/competitions/learning-equality-curriculum-recommendations) (Jan 2023 - Apr 2023)
 
-The goal of this competition was to streamline the process of matching educational content (documents, videos, webpages, etc.) to specific topics in a curriculum (a collection of hierarchical subject taxonomies in various languages). The competition was hosted by the non-profit organization Learning Equality, together with The Learning Agency Lab and UNHCR. Efficient and scalable solutions would support efforts to help people across the world access quality education, providing curricular experts with tailored recommendations for open educational resources relevant to local school programs, therefore reducing their time spent curating content.
+The challenge that inspired this project exemplifies the power of machine learning models in the context of education—and, crucially, the importance of getting them right while making them accessible. The goal is to streamline the process of matching educational content (documents, videos, webpages, etc.) to specific topics in a curriculum (hierarchical collections of subjects in various languages). Scalable solutions could support efforts to help people across the world access quality education, providing curricular experts with tailored recommendations for open educational resources relevant to local school programs, and thus helping them work more efficiently when curating content. To this effect, a Kaggle code competition was hosted by the non-profit organization Learning Equality, together with The Learning Agency Lab and UNHCR, between December 2022 and March 2023.
 
-See my public submission [here](https://www.kaggle.com/federicodevitohalevy/lecr-modeling). (Note that hyperparameters may not match those mentioned below.)
+See my public submission [here](https://www.kaggle.com/federicodevitohalevy/lecr-modeling) and read on for a general description of its implementation. (Note that hyperparameters may not match across notebooks.)
 
 ### Introduction
 
