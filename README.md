@@ -4,7 +4,7 @@ This repository contains personal projects associated with Kaggle competitions a
 
 ## [Learning Equality - Curriculum Recommendations](https://www.kaggle.com/competitions/learning-equality-curriculum-recommendations) (Jan 2023 - Apr 2023)
 
-The challenge that inspired this project exemplifies the importance of getting ML models right, while making them accessible. The context is education; the goal is to streamline the process of matching content (documents, videos, webpages, etc.) to specific topics in a curriculum (hierarchical collections of subjects in various languages). Scalable solutions could support efforts to help people across the world access quality education, providing curricular experts with tailored recommendations for open resources relevant to local school programs, and thus helping them work more efficiently when curating content. To this effect, a Kaggle code competition was hosted by the non-profit organization Learning Equality, together with The Learning Agency Lab and UNHCR, between December 2022 and March 2023.
+The challenge that inspired this project exemplifies the importance of getting ML tools right, while making them accessible. The context is education; the goal is to streamline the process of matching content (documents, videos, webpages, etc.) to specific topics in a curriculum (hierarchical collections of subjects in various languages). Scalable solutions could support efforts to help people across the world access quality education, providing curricular experts with tailored recommendations for open resources relevant to local school programs, and thus helping them work more efficiently when curating content. To this effect, a Kaggle code competition was hosted by the non-profit organization Learning Equality, together with The Learning Agency Lab and UNHCR, between December 2022 and March 2023.
 
 See my public submission [here](https://www.kaggle.com/federicodevitohalevy/lecr-modeling), and read on for more details on the challenge and a general description of my proposed solution. (Note that hyperparameters may not match across notebooks mentioned.)
 
@@ -14,7 +14,7 @@ See my public submission [here](https://www.kaggle.com/federicodevitohalevy/lecr
 
 **Strategy:** My proposed solution approaches the task as a metric learning and vector search problem, and generates content recommendations in two stages. Each topic and content is assigned a vector representation—an embedding of its text features—in a single shared latent space, such that neighboring items (of distinct type) are likely to be good matches. For the similarity search to be scalable, a pool of candidate pairs is first retrieved by comparing bi-encoded embeddings, learned by two transformer networks attending separately to topics and contents (forming a *retriever* model). A given topic and up to *k* of its nearest content neighbors are then passed to a third network (a *reranker* model), which attends to cross-encoded features before classifying each pairing either as a match or a suggestion to reject.
 
-**Related work:** The implementation combines ideas from the information retrieval literature, with the following key references: [Karpukhin et al.](https://arxiv.org/abs/2004.04906) (retriever setup: biencoding, similarity metric, loss function, in-batch negatives), [Hamilton et al.](https://arxiv.org/abs/1706.02216) (graph learning: aggregation algorithm), [Glass et al.](https://arxiv.org/abs/2207.06300) (multi-stage setup: reranker architecture, reranker loss function, staged training), and the `sentence-transformers` [codebase](https://github.com/UKPLab/sentence-transformers) and [documentation](https://www.sbert.net/).
+**Related work:** The implementation combines ideas from the information retrieval literature, with the following key references: [Karpukhin et al.](https://arxiv.org/abs/2004.04906) (retriever setup: biencoding, similarity metric, loss function, in-batch negatives), [Hamilton et al.](https://arxiv.org/abs/1706.02216) (graph learning: aggregation algorithm), [Glass et al.](https://arxiv.org/abs/2207.06300) (multi-stage setup: reranker architecture, reranker loss function, staged training), the `sentence-transformers` [codebase](https://github.com/UKPLab/sentence-transformers) and [documentation](https://www.sbert.net/) (sentence embedding), and Pinecone's [website](https://www.pinecone.io/learn/) (vector search).
 
 ### Exploratory analysis
 
@@ -58,4 +58,10 @@ All training rounds follow a one-cycle learning rate schedule over all epochs to
 
 - Stacking biencoded and cross-encoded representations of topic-content pairs before the reranker's classification head (a new layer with 3 input channels) would introduce gradient flow to the retriever (with end-to-end training) and might improve performance.
 
-- Text augmentations (e.g. multiple crops, translated samples, etc.) for larger and more robust training.
+- Text augmentations (e.g. multiple crops of each sample, language translation, etc.) for larger and more robust training.
+
+- Hyperparameter tuning (explored very minimally).
+
+- More sophisticated aggregation of topic embeddings (e.g. GAT models).
+
+- Streamline and optimize with `PyTorch 2.0` and `PyTorch Lightning`.
